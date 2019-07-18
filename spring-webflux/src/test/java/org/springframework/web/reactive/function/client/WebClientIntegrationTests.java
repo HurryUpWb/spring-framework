@@ -354,7 +354,7 @@ public class WebClientIntegrationTests {
 				.uri("/pojo/capitalize")
 				.accept(MediaType.APPLICATION_JSON)
 				.contentType(MediaType.APPLICATION_JSON)
-				.syncBody(new Pojo("foofoo", "barbar"))
+				.body(new Pojo("foofoo", "barbar"))
 				.retrieve()
 				.bodyToMono(Pojo.class);
 
@@ -618,6 +618,50 @@ public class WebClientIntegrationTests {
 		StepVerifier.create(result)
 				.expectError(MyException.class)
 				.verify(Duration.ofSeconds(3));
+
+		expectRequestCount(1);
+		expectRequest(request -> {
+			assertThat(request.getHeader(HttpHeaders.ACCEPT)).isEqualTo("*/*");
+			assertThat(request.getPath()).isEqualTo("/greeting?name=Spring");
+		});
+	}
+
+	@Test
+	public void emptyStatusHandlerShouldReturnBody() {
+		prepareResponse(response -> response.setResponseCode(500)
+				.setHeader("Content-Type", "text/plain").setBody("Internal Server error"));
+
+		Mono<String> result = this.webClient.get()
+				.uri("/greeting?name=Spring")
+				.retrieve()
+				.onStatus(HttpStatus::is5xxServerError, response -> Mono.empty())
+				.bodyToMono(String.class);
+
+		StepVerifier.create(result)
+				.expectNext("Internal Server error")
+				.verifyComplete();
+
+		expectRequestCount(1);
+		expectRequest(request -> {
+			assertThat(request.getHeader(HttpHeaders.ACCEPT)).isEqualTo("*/*");
+			assertThat(request.getPath()).isEqualTo("/greeting?name=Spring");
+		});
+	}
+
+	@Test
+	public void emptyStatusHandlerShouldReturnBodyFlux() {
+		prepareResponse(response -> response.setResponseCode(500)
+				.setHeader("Content-Type", "text/plain").setBody("Internal Server error"));
+
+		Flux<String> result = this.webClient.get()
+				.uri("/greeting?name=Spring")
+				.retrieve()
+				.onStatus(HttpStatus::is5xxServerError, response -> Mono.empty())
+				.bodyToFlux(String.class);
+
+		StepVerifier.create(result)
+				.expectNext("Internal Server error")
+				.verifyComplete();
 
 		expectRequestCount(1);
 		expectRequest(request -> {
